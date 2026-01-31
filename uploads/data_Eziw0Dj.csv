@@ -1,0 +1,6 @@
+Equipment Name,Type,Flowrate,Pressure,Temperature
+Mixer 1,Rotary,500,45,60
+Mixer 2,Rotary,520,48,62
+Tank 101,Static,0,12,25
+Tank 102,Static,0,11,24
+Reactor A,Static,100,80,120
