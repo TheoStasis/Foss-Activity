@@ -45,7 +45,7 @@ git push origin main
 7. Fill in the details:
    - **Name**: `chemviz-backend` (or any name)
    - **Runtime**: `Python 3`
-   - **Build Command**: `pip install -r requirements.txt`
+   - **Build Command**: `bash build.sh`
    - **Start Command**: `gunicorn core.wsgi:application`
 
 ---
