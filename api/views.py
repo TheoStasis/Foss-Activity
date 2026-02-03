@@ -1,54 +1,102 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser
-from .models import Dataset
-from .pdf_generator import generate_equipment_pdf # Import the new file
-from django.http import HttpResponse  # <--- ADD THIS
+from django.http import HttpResponse
+from django.contrib.auth.models import User
+from rest_framework import generics, permissions
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.serializers import ModelSerializer
 import pandas as pd
 import os
+import datetime
+from .mongo_models import UserDataset, UserProfile
+from .pdf_generator import generate_equipment_pdf
+
+# Serializer for Registration
+class RegisterSerializer(ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('username', 'password')
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            password=validated_data['password']
+        )
+        # Create MongoDB user profile
+        UserProfile.objects.create(username=user.username, email=user.email or "")
+        return user
+
+# Register View
+class RegisterView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    permission_classes = (AllowAny,)
+    serializer_class = RegisterSerializer
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(
+            {"message": "User registered successfully. Please login."}, 
+            status=201
+        )
 
 class StatsView(APIView):
+    permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser]
 
     def get(self, request):
-        """Get the last 5 datasets"""
-        recent = Dataset.objects.all()[:5]
-        history = []
-        for item in recent:
-            history.append({
-                "id": item.id,
-                "filename": os.path.basename(item.filename),
-                "date": item.uploaded_at.strftime("%Y-%m-%d %H:%M"),
-                "stats": item.stats
-            })
-        return Response(history)
+        """Get history for logged-in user only"""
+        try:
+            username = request.user.username
+            # Get only this user's datasets from MongoDB
+            datasets = UserDataset.objects(user=username).order_by('-uploaded_at')[:10]
+            
+            history = []
+            for item in datasets:
+                history.append({
+                    "id": str(item.id),
+                    "filename": item.filename,
+                    "date": item.uploaded_at.strftime("%Y-%m-%d %H:%M"),
+                    "stats": item.stats
+                })
+            return Response(history)
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
 
     def post(self, request):
-        """Upload and process a new file"""
+        """Upload and process a new file - store with user"""
         try:
+            username = request.user.username
             file_obj = request.FILES['file']
             
-            # 1. Read with Pandas FIRST to ensure it's valid
+            # Read with Pandas
             df = pd.read_csv(file_obj)
             
-            # 2. Calculate Stats
+            # Calculate Stats
             stats_data = {
                 "count": len(df),
-                "avg_pressure": df['Pressure'].mean() if 'Pressure' in df.columns else 0,
-                "avg_temp": df['Temperature'].mean() if 'Temperature' in df.columns else 0,
+                "avg_pressure": float(df['Pressure'].mean()) if 'Pressure' in df.columns else 0,
+                "avg_temp": float(df['Temperature'].mean()) if 'Temperature' in df.columns else 0,
                 "types": df['Type'].value_counts().to_dict() if 'Type' in df.columns else {},
-                "recent_entries": df.head(5).to_dict(orient='records')
+                "recent_entries": df.head(10).to_dict(orient='records')
             }
 
-            # 3. Save to Database
-            # Reset file pointer to beginning so Django can save it
-            file_obj.seek(0)
-            dataset = Dataset.objects.create(file=file_obj, stats=stats_data)
+            # Save to MongoDB with username
+            dataset = UserDataset(
+                user=username,
+                filename=file_obj.name,
+                stats=stats_data,
+                file_path=f"uploads/{file_obj.name}",
+                uploaded_at=datetime.datetime.utcnow()
+            )
+            dataset.save()
             
-            # 4. Return the same structure as history items
             return Response({
-                "id": dataset.id,
-                "filename": os.path.basename(dataset.filename),
+                "id": str(dataset.id),
+                "filename": dataset.filename,
                 "date": dataset.uploaded_at.strftime("%Y-%m-%d %H:%M"),
                 "stats": stats_data
             })
@@ -57,14 +105,22 @@ class StatsView(APIView):
             return Response({"error": str(e)}, status=400)
 
 class PDFDownloadView(APIView):
+    permission_classes = [IsAuthenticated]
+    
     def get(self, request, dataset_id):
         try:
-            dataset = Dataset.objects.get(id=dataset_id)
+            username = request.user.username
+            # Verify user owns this dataset
+            dataset = UserDataset.objects(id=dataset_id, user=username).first()
+            
+            if not dataset:
+                return Response({"error": "Dataset not found or access denied"}, status=404)
+            
             pdf_buffer = generate_equipment_pdf(dataset)
             
-            # Return as a downloadable file
             response = HttpResponse(pdf_buffer, content_type='application/pdf')
             response['Content-Disposition'] = f'attachment; filename="report_{dataset.id}.pdf"'
             return response
-        except Dataset.DoesNotExist:
-            return Response({"error": "Dataset not found"}, status=404)
+            
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)

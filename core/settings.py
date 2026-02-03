@@ -121,3 +121,21 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 CORS_ALLOW_ALL_ORIGINS = True
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1), # Long session for dev
+}
+
+# MongoDB Configuration
+import mongoengine as mongo
+MONGODB_URI = "mongodb+srv://tanay:yOxMelUKO8j3UQAT@theostasis.5lmt65b.mongodb.net/chemviz?appName=TheoStasis&retryWrites=true&w=majority"
+mongo.connect('chemviz', host=MONGODB_URI)
