@@ -45,7 +45,7 @@ git push origin main
 7. Fill in the details:
    - **Name**: `chemviz-backend` (or any name)
    - **Runtime**: `Python 3`
-   - **Build Command**: `bash build.sh`
+   - **Build Command**: `pip install -r requirements.txt`
    - **Start Command**: `gunicorn core.wsgi:application`
 
 ---
@@ -153,10 +153,10 @@ Once backend is live on Render:
 ## Troubleshooting
 
 ### If build fails:
-- Check Render logs (scroll in deployment tab)
-- Make sure `requirements.txt` has all packages with correct versions
-- Make sure `runtime.txt` exists with `python-3.12.1`
-- All packages are tested to have pre-built wheels for Python 3.12
+- Check Render logs carefully
+- Make sure `requirements.txt` exists and has all packages
+- Make sure `runtime.txt` exists
+- Try deleting and redeploying from scratch
 
 ### If frontend can't reach backend:
 - Check CORS settings in backend `settings.py`
