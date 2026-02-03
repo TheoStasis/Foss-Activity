@@ -100,11 +100,32 @@ function App() {
 
   const fetchHistory = async () => {
     try {
-      const res = await axios.get('http://127.0.0.1:8000/api/stats/');
+      const token = localStorage.getItem('access_token');
+      const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/stats/`, {
+        headers: {'Authorization': `Bearer ${token}`}
+      });
       setHistory(res.data);
       if (res.data.length > 0 && !currentData) setCurrentData(res.data[0]);
     } catch (err) { 
         if (err.response && err.response.status === 401) logout();
+    }
+  };
+
+  const deleteHistory = async (item_id, e) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this dataset? This action cannot be undone.')) return;
+    
+    try {
+      await axios.delete(`${import.meta.env.VITE_API_BASE_URL}/api/delete/${item_id}/`);
+      setHistory(history.filter(h => h.id !== item_id));
+      if (currentData?.id === item_id) {
+        setCurrentData(history.length > 1 ? history[0] : null);
+        setActiveTab('history');
+      }
+      alert('Dataset deleted successfully');
+    } catch (err) {
+      console.error("Delete Error:", err);
+      alert("Failed to delete dataset");
     }
   };
 
@@ -114,7 +135,7 @@ function App() {
     const formData = new FormData();
     formData.append('file', file);
     try {
-      const res = await axios.post('http://127.0.0.1:8000/api/stats/', formData);
+      const res = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/stats/`, formData);
       setCurrentData(res.data);
       fetchHistory();
       setActiveTab('dashboard');
@@ -129,7 +150,7 @@ function App() {
       return;
     }
     try {
-      const response = await axios.get(`http://127.0.0.1:8000/api/report/${currentData.id}/`, { 
+      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/report/${currentData.id}/`, { 
         responseType: 'blob',
         headers: {'Authorization': `Bearer ${token}`}
       });
@@ -159,7 +180,7 @@ function App() {
       case 'dashboard': return <DashboardView stats={currentData?.stats} />;
       case 'upload': return <UploadView file={file} setFile={setFile} loading={loading} handleUpload={handleUpload} />;
       case 'datatable': return <DataTableView data={currentData?.stats?.recent_entries} />;
-      case 'history': return <HistoryView history={history} load={(item) => { setCurrentData(item); setActiveTab('dashboard'); }} />;
+      case 'history': return <HistoryView history={history} load={(item) => { setCurrentData(item); setActiveTab('dashboard'); }} delete={deleteHistory} />;
       case 'reports': return <ReportsView data={currentData} download={downloadReport} />;
       default: return <DashboardView stats={currentData?.stats} />;
     }
@@ -225,7 +246,7 @@ const AuthView = ({ setToken }) => {
         setError('');
         const endpoint = isRegister ? 'register' : 'token';
         try {
-            const res = await axios.post(`http://127.0.0.1:8000/api/${endpoint}/`, { username, password });
+            const res = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/${endpoint}/`, { username, password });
             if (isRegister) {
                 if (res.status === 201 || res.status === 200) {
                     alert("Registration successful! Please login.");
@@ -474,7 +495,7 @@ const DataTableView = ({ data }) => {
   );
 };
 
-const HistoryView = ({ history, load }) => (
+const HistoryView = ({ history, load, delete: deleteItem }) => (
   <div style={{width: '100%'}}>
     <div style={{marginBottom: '20px'}}>
       <h2 style={{fontSize: '20px', fontWeight: '700', margin: '0 0 12px 0'}}>Your Upload History</h2>
@@ -502,9 +523,35 @@ const HistoryView = ({ history, load }) => (
           >
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px'}}>
               <h3 style={{margin: '0', fontSize: '16px', fontWeight: '600', flex: 1}}>{item.filename}</h3>
-              <span style={{background: 'rgba(10, 132, 255, 0.1)', color: 'var(--primary)', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600'}}>
-                ACTIVE
-              </span>
+              <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                <span style={{background: 'rgba(10, 132, 255, 0.1)', color: 'var(--primary)', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600'}}>
+                  ACTIVE
+                </span>
+                <button
+                  onClick={(e) => deleteItem(item.id, e)}
+                  style={{
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: 'none',
+                    color: '#ef4444',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.background = 'rgba(239, 68, 68, 0.2)';
+                    e.target.style.color = '#fca5a5';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.background = 'rgba(239, 68, 68, 0.1)';
+                    e.target.style.color = '#ef4444';
+                  }}
+                >
+                  🗑️ DELETE
+                </button>
+              </div>
             </div>
             <p style={{color:'var(--text-secondary)', fontSize: '13px', margin: '4px 0'}}>
               📊 {item.stats?.count || 0} records

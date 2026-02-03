@@ -139,3 +139,30 @@ class PDFDownloadView(APIView):
             print(f"PDFDownloadView Error: {str(e)}")
             print(traceback.format_exc())
             return Response({"error": f"Server error: {str(e)}"}, status=500)
+
+class DeleteDatasetView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def delete(self, request, dataset_id):
+        try:
+            username = request.user.username
+            
+            # Try to find and delete dataset with user ownership check
+            try:
+                from mongoengine import ObjectId
+                try:
+                    obj_id = ObjectId(dataset_id)
+                    dataset = UserDataset.objects(id=obj_id, user=username).first()
+                except:
+                    dataset = UserDataset.objects(id=dataset_id, user=username).first()
+            except:
+                dataset = UserDataset.objects(id=dataset_id, user=username).first()
+            
+            if not dataset:
+                return Response({"error": f"Dataset not found or access denied"}, status=404)
+            
+            dataset.delete()
+            return Response({"message": "Dataset deleted successfully"}, status=200)
+            
+        except Exception as e:
+            return Response({"error": f"Failed to delete dataset: {str(e)}"}, status=400)

@@ -5,6 +5,11 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtWidgets import (QApplication, QWidget, QVBoxLayout, QPushButton, 
                              QLabel, QFileDialog, QMessageBox, QHBoxLayout, QFrame, QLineEdit, QDialog)
 from PyQt5.QtCore import Qt
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+API_BASE_URL = os.getenv('VITE_API_BASE_URL', 'http://localhost:8000')
 
 # --- THEME CONFIGURATION ---
 THEME = {
@@ -86,7 +91,7 @@ class LoginWindow(QDialog):
             QMessageBox.warning(self, "Error", "Please fill all fields")
             return
         try:
-            res = requests.post('http://127.0.0.1:8000/api/token/', json={'username': u, 'password': p})
+            res = requests.post(f'{API_BASE_URL}/api/token/', json={'username': u, 'password': p})
             if res.status_code == 200:
                 self.token = res.json()['access']
                 self.accept()
@@ -99,7 +104,7 @@ class LoginWindow(QDialog):
             QMessageBox.warning(self, "Error", "Please fill all fields")
             return
         try:
-            res = requests.post('http://127.0.0.1:8000/api/register/', json={'username': u, 'password': p})
+            res = requests.post(f'{API_BASE_URL}/api/register/', json={'username': u, 'password': p})
             if res.status_code == 201: QMessageBox.information(self, "Success", "Account created! Please login.")
             else: QMessageBox.warning(self, "Error", "Registration failed. Username may exist.")
         except: QMessageBox.critical(self, "Error", "Cannot connect")
@@ -274,12 +279,126 @@ class ModernDesktop(QWidget):
     def show_history(self):
         """Show upload history"""
         self.clear_content()
-        self.header_label.setText("History")
+        self.header_label.setText("Upload History")
         
-        msg = QLabel("📋 History feature coming soon")
-        msg.setStyleSheet(f"color: {THEME['text_muted']}; font-size: 16px;")
-        msg.setAlignment(Qt.AlignCenter)
-        self.content_layout.addWidget(msg, 1)
+        try:
+            # Fetch history from backend
+            res = requests.get(f'{API_BASE_URL}/api/stats/', headers=self.headers)
+            if res.status_code == 200:
+                history = res.json()
+                if not history:
+                    msg = QLabel("📋 No uploads yet. Start by uploading a dataset.")
+                    msg.setStyleSheet(f"color: {THEME['text_muted']}; font-size: 16px;")
+                    msg.setAlignment(Qt.AlignCenter)
+                    self.content_layout.addWidget(msg, 1)
+                    return
+                
+                # Create history grid
+                scroll_area = QFrame()
+                scroll_layout = QVBoxLayout(scroll_area)
+                scroll_layout.setSpacing(12)
+                scroll_layout.setContentsMargins(0, 0, 0, 0)
+                
+                for item in history:
+                    history_card = self.create_history_card(item)
+                    scroll_layout.addWidget(history_card)
+                
+                scroll_layout.addStretch()
+                self.content_layout.addWidget(scroll_area, 1)
+            else:
+                QMessageBox.warning(self, "Error", "Failed to fetch history")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Error loading history: {str(e)}")
+
+    def create_history_card(self, item):
+        """Create a clickable history card with load and delete buttons"""
+        card = QFrame()
+        card.setObjectName("Card")
+        card.setFixedHeight(120)
+        card.setCursor(Qt.PointingHandCursor)
+        
+        layout = QHBoxLayout(card)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(16)
+        
+        # Left side - info
+        info_layout = QVBoxLayout()
+        info_layout.setSpacing(6)
+        
+        filename = QLabel(item.get('filename', 'Unknown'))
+        filename.setStyleSheet(f"color: {THEME['text_main']}; font-size: 14px; font-weight: 600;")
+        
+        stats_text = item.get('stats', {})
+        count = stats_text.get('count', 0)
+        pressure = stats_text.get('avg_pressure', 0)
+        date = item.get('date', 'N/A')
+        
+        details = QLabel(f"📊 {count} records  |  💨 {pressure:.1f} Pa  |  🕐 {date}")
+        details.setStyleSheet(f"color: {THEME['text_muted']}; font-size: 12px;")
+        
+        info_layout.addWidget(filename)
+        info_layout.addWidget(details)
+        
+        # Right side - load and delete buttons
+        button_layout = QVBoxLayout()
+        button_layout.setSpacing(8)
+        button_layout.setContentsMargins(0, 0, 0, 0)
+        
+        button_h_layout = QHBoxLayout()
+        button_h_layout.setSpacing(8)
+        button_h_layout.setContentsMargins(0, 0, 0, 0)
+        
+        load_btn = QPushButton("Load")
+        load_btn.setObjectName("ActionBtn")
+        load_btn.setFixedWidth(75)
+        load_btn.setFixedHeight(35)
+        load_btn.clicked.connect(lambda: self.load_history_item(item))
+        
+        delete_btn = QPushButton("Delete")
+        delete_btn.setObjectName("ActionBtn")
+        delete_btn.setFixedWidth(75)
+        delete_btn.setFixedHeight(35)
+        delete_btn.setStyleSheet(f"background-color: rgba(239, 68, 68, 0.1); color: #ef4444; border-radius: 8px; font-weight: 600;")
+        delete_btn.clicked.connect(lambda: self.delete_history_item(item))
+        
+        button_h_layout.addWidget(load_btn)
+        button_h_layout.addWidget(delete_btn)
+        
+        button_layout.addLayout(button_h_layout)
+        button_layout.addStretch()
+        
+        layout.addLayout(info_layout, 1)
+        layout.addLayout(button_layout)
+        
+        return card
+
+    def load_history_item(self, item):
+        """Load selected history item"""
+        self.current_data = item
+        self.show_dashboard()
+
+    def delete_history_item(self, item):
+        """Delete selected history item"""
+        reply = QMessageBox.question(
+            self, 
+            "Confirm Delete", 
+            f"Are you sure you want to delete '{item.get('filename', 'Unknown')}'? This action cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            try:
+                dataset_id = item.get('id')
+                res = requests.delete(f'{API_BASE_URL}/api/delete/{dataset_id}/', headers=self.headers)
+                if res.status_code == 200:
+                    QMessageBox.information(self, "Success", "Dataset deleted successfully")
+                    # Refresh history
+                    self.show_history()
+                else:
+                    QMessageBox.warning(self, "Error", "Failed to delete dataset")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error deleting dataset: {str(e)}")
 
     def clear_content(self):
         """Clear content layout"""
@@ -323,7 +442,7 @@ class ModernDesktop(QWidget):
             try:
                 with open(fname, 'rb') as f:
                     files = {'file': f}
-                    res = requests.post('http://127.0.0.1:8000/api/stats/', files=files, headers=self.headers)
+                    res = requests.post(f'{API_BASE_URL}/api/stats/', files=files, headers=self.headers)
                 
                 if res.status_code == 200:
                     self.current_data = res.json()
