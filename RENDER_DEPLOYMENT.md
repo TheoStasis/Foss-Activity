@@ -2,52 +2,22 @@
 
 ## Step 1: Prepare Your Code for Render
 
-### Add requirements.txt (if not present)
-Run this in your backend directory to create/update requirements.txt:
-```bash
-pip freeze > requirements.txt
-```
+### Clean requirements.txt is Ready ✅
+The file has been cleaned to remove Windows-specific packages like `pywin32` and incompatible versions. Only necessary production packages are included:
+- Django, DRF, JWT, CORS, MongoEngine, Pandas, ReportLab, python-dotenv, Gunicorn
 
-Make sure these packages are in requirements.txt:
-```
-Django==6.0.1
-djangorestframework==3.14.0
-djangorestframework-simplejwt==5.3.2
-django-cors-headers==4.3.1
-mongoengine==0.27.0
-pandas==2.0.3
-reportlab==4.0.7
-python-dotenv==1.2.1
-gunicorn==21.2.0
-```
+### Add runtime.txt (Python version) ✅
+File already created with `python-3.12.1`
 
-### Add runtime.txt (Python version)
-Create `runtime.txt` in your backend root:
-```
-python-3.12.1
-```
+### Update settings.py for Production ✅
+Already configured with:
+- `DEBUG = os.getenv('DEBUG', 'False') == 'True'`
+- `ALLOWED_HOSTS` from environment variables
+- `CORS_ALLOWED_ORIGINS` with localhost and frontend URL
+- Static files configuration for production
 
-### Update settings.py for Production
-Add these to your `core/settings.py`:
-
-Replace the ALLOWED_HOSTS line (around line 27):
-```python
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-```
-
-Make sure DEBUG is set correctly:
-```python
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
-```
-
-Add CORS for your Vercel frontend:
-```python
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    os.getenv('FRONTEND_URL', 'http://localhost:3000'),
-]
-```
+### Procfile Created ✅
+Automatically runs `gunicorn core.wsgi:application`
 
 ---
 
