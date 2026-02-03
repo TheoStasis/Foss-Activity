@@ -110,17 +110,32 @@ class PDFDownloadView(APIView):
     def get(self, request, dataset_id):
         try:
             username = request.user.username
-            # Verify user owns this dataset
-            dataset = UserDataset.objects(id=dataset_id, user=username).first()
+            
+            # Try to find dataset with string ID first (MongoDB ObjectId as string)
+            try:
+                from mongoengine import ObjectId
+                try:
+                    obj_id = ObjectId(dataset_id)
+                    dataset = UserDataset.objects(id=obj_id, user=username).first()
+                except:
+                    # If ObjectId conversion fails, try direct string match
+                    dataset = UserDataset.objects(id=dataset_id, user=username).first()
+            except:
+                dataset = UserDataset.objects(id=dataset_id, user=username).first()
             
             if not dataset:
-                return Response({"error": "Dataset not found or access denied"}, status=404)
+                return Response({"error": f"Dataset {dataset_id} not found or access denied for user {username}"}, status=404)
             
-            pdf_buffer = generate_equipment_pdf(dataset)
-            
-            response = HttpResponse(pdf_buffer, content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="report_{dataset.id}.pdf"'
-            return response
+            try:
+                pdf_buffer = generate_equipment_pdf(dataset)
+                response = HttpResponse(pdf_buffer, content_type='application/pdf')
+                response['Content-Disposition'] = f'attachment; filename="report_{dataset.id}.pdf"'
+                return response
+            except Exception as pdf_err:
+                return Response({"error": f"PDF generation failed: {str(pdf_err)}"}, status=400)
             
         except Exception as e:
-            return Response({"error": str(e)}, status=400)
+            import traceback
+            print(f"PDFDownloadView Error: {str(e)}")
+            print(traceback.format_exc())
+            return Response({"error": f"Server error: {str(e)}"}, status=500)

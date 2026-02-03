@@ -124,17 +124,30 @@ function App() {
   };
 
   const downloadReport = async () => {
-    if (!currentData) return;
+    if (!currentData) {
+      alert("No dataset selected");
+      return;
+    }
     try {
-      const response = await axios.get(`http://127.0.0.1:8000/api/report/${currentData.id}/`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Report_${currentData.filename}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (err) { alert("Failed to generate PDF"); }
+      const response = await axios.get(`http://127.0.0.1:8000/api/report/${currentData.id}/`, { 
+        responseType: 'blob',
+        headers: {'Authorization': `Bearer ${token}`}
+      });
+      
+      if (response.status === 200) {
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Report_${currentData.filename}_${new Date().toISOString().split('T')[0]}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.parentNode.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (err) { 
+      console.error("PDF Error:", err);
+      alert("Failed to download PDF. Make sure you have selected a dataset."); 
+    }
   };
 
   if (!token) {
