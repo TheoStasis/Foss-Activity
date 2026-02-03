@@ -7,7 +7,7 @@ The file has been cleaned to remove Windows-specific packages like `pywin32` and
 - Django, DRF, JWT, CORS, MongoEngine, Pandas, ReportLab, python-dotenv, Gunicorn
 
 ### Add runtime.txt (Python version) ✅
-File already created with `python-3.13.4` (Render's default Python version)
+File already created with `python-3.12.1` (stable version with excellent package support)
 
 ### Update settings.py for Production ✅
 Already configured with:
@@ -155,8 +155,8 @@ Once backend is live on Render:
 ### If build fails:
 - Check Render logs (scroll in deployment tab)
 - Make sure `requirements.txt` has all packages with correct versions
-- Make sure `runtime.txt` exists with `python-3.13.4` (or latest Python 3.x version Render supports)
-- If you see version errors, check PyPI for actual available versions of that package
+- Make sure `runtime.txt` exists with `python-3.12.1`
+- All packages are tested to have pre-built wheels for Python 3.12
 
 ### If frontend can't reach backend:
 - Check CORS settings in backend `settings.py`
