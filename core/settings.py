@@ -84,7 +84,8 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.dummy',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -149,5 +150,14 @@ SIMPLE_JWT = {
 
 # MongoDB Configuration
 import mongoengine as mongo
-MONGODB_URI = os.getenv('MONGODB_URI', "mongodb+srv://tanay:yOxMelUKO8j3UQAT@theostasis.5lmt65b.mongodb.net/chemviz")
-mongo.connect('chemviz', host=MONGODB_URI)
+try:
+    MONGODB_URI = os.getenv('MONGODB_URI')  # Ensure this Env Var is set in Dashboard!
+    if not MONGODB_URI:
+        # Fallback only for local testing, remove for production safety if you want
+        MONGODB_URI = "mongodb+srv://tanay:yOxMelUKO8j3UQAT@theostasis.5lmt65b.mongodb.net/chemviz"
+    
+    print(f"Connecting to MongoDB...")  # This helps debug in logs
+    mongo.connect('chemviz', host=MONGODB_URI)
+    print("Connected successfully.")
+except Exception as e:
+    print(f"ERROR: Could not connect to MongoDB: {e}")
