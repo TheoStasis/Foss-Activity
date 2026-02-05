@@ -22,12 +22,22 @@ class RegisterSerializer(ModelSerializer):
         extra_kwargs = {'password': {'write_only': True}}
 
     def create(self, validated_data):
+        # Create Django auth user in SQLite
         user = User.objects.create_user(
             username=validated_data['username'],
             password=validated_data['password']
         )
-        # Create MongoDB user profile
-        UserProfile.objects.create(username=user.username, email=user.email or "")
+
+        # Best-effort MongoDB profile creation so deployment issues
+        # (network/DNS, Mongo down, etc.) don't break registration
+        try:
+            UserProfile.objects.create(
+                username=user.username,
+                email=user.email or ""
+            )
+        except Exception as e:
+            print(f"WARNING: Failed to create Mongo UserProfile for {user.username}: {e}")
+
         return user
 
 # Register View
