@@ -130,6 +130,7 @@ STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 
 CORS_ALLOWED_ORIGINS = [
+    "https://foss-activity.vercel.app",
     "http://localhost:5173",
     "http://localhost:3000",
     os.getenv('FRONTEND_URL', 'http://localhost:3000'),
