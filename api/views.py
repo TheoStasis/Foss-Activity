@@ -6,6 +6,8 @@ from django.contrib.auth.models import User
 from rest_framework import generics, permissions
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.serializers import ModelSerializer
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 import pandas as pd
 import os
 import datetime
@@ -29,6 +31,7 @@ class RegisterSerializer(ModelSerializer):
         return user
 
 # Register View
+@method_decorator(csrf_exempt, name='dispatch')
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     permission_classes = (AllowAny,)
@@ -43,6 +46,7 @@ class RegisterView(generics.CreateAPIView):
             status=201
         )
 
+@method_decorator(csrf_exempt, name='dispatch')
 class StatsView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser]
